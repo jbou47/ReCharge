@@ -127,8 +127,13 @@ class ViewController: UIViewController, InfoPaneDelegateProtocol {
         
         if mapView.annotations.count != 0 {
             print("annotations removed")
-            mapView.removeAnnotation(mapView!.annotations as! MKAnnotation)
+            let allAnnotations = self.mapView.annotations
+            mapView.removeAnnotations(allAnnotations)
+            print(self.mapView.annotations)
         }
+        let allAnnotations = self.mapView.annotations
+        mapView.removeAnnotations(allAnnotations)
+        print(self.mapView.annotations)
         
         view.addSubview(containerView)
         self.closeInfoPane()
@@ -181,34 +186,6 @@ class ViewController: UIViewController, InfoPaneDelegateProtocol {
         let urlString = "https://developer.nrel.gov/api/alt-fuel-stations/v1/nearest.json?api_key=OxpIDL7uE8O60BL52DC7YYp3T1mq4uy01wlLw5bK&latitude=\(coordinate.latitude)&longitude=\(coordinate.longitude)&radius=\(userSettings.proximity)&fuel_type=ELEC&limit=\(amount)"
         
         guard let url = URL(string: urlString) else { return }
-    
-        /*let configuration = URLSessionConfiguration.ephemeral
-        let session = URLSession(configuration: configuration, delegate: nil, delegateQueue: OperationQueue.main)
-        let task = session.dataTask(with: scriptUrl, completionHandler: { [weak self] (data: Data?, response: URLResponse?, error: Error?) -> Void in
-            // Parse the data in the response and use it
-            do {
-                let json = try JSONSerialization.jsonObject(with: data!, options: []) as! [String: AnyObject]
-                
-                print(json)
-                
-                //let stationArray = json["fuel_stations"]
-                //print(stationArray)
-                
-                //TODO figure out how to parse JSON object
-                
-                //hardcode in station data for West Lafette
-                self!.stations.append(FuelStationAnnotation.init(station_name: "Purdue University - Armory", street_address: "812 3rd St\nWest Lafayette, IN", is_paid: false, latitude: 40.4277617, longitude: -86.9162607))
-                self!.stations.append(FuelStationAnnotation.init(station_name: "Purdue University - Northwestern Parking Garage", street_address: "460 Northwestern Ave\nWest Lafayette, IN", is_paid: false, latitude: 40.4296753, longitude: -86.9120266))
-                self!.stations.append(FuelStationAnnotation.init(station_name: "Purdue University - University Street Garage", street_address: "610 Purdue Mall\nWest Lafayette, IN", is_paid: true, latitude: 40.426713, longitude: -86.917213))
-                self!.stations.append(FuelStationAnnotation.init(station_name: "Purdue University - Grant Street Parking Garage", street_address: "120 N Grant St\nWest Lafayette, IN", is_paid: false, latitude: 40.4244203, longitude: -86.9103211))
-                self!.stations.append(FuelStationAnnotation.init(station_name: "Purdue University - Harrison Street Garage", street_address: "719 Clinic Dr\nWest Lafayette, IN", is_paid: true, latitude: 40.421241, longitude: -86.917619))
-                
-                self?.addStationAnnotations()
-            } catch let error as NSError {
-                print("Failed to load: \(error.localizedDescription)")
-            }
-        })
-        task.resume()*/
         
         URLSession.shared.dataTask(with: url) { (data, response, err) in
             
@@ -220,8 +197,9 @@ class ViewController: UIViewController, InfoPaneDelegateProtocol {
             do {
                 let NRELJson = try JSONDecoder().decode(NRELJsonObj.self, from: data)
                 
-                print(NRELJson)
+                //print(NRELJson)
                 print(urlString)
+                testCount = 0
                 
                 for fuel_station in NRELJson.fuel_stations {
                     let temp = FuelStationAnnotation(obj: fuel_station)
@@ -280,19 +258,19 @@ class ViewController: UIViewController, InfoPaneDelegateProtocol {
         var matchedCriteria = true
         
         // check if available switch is true and charging station is available
-        if userSettings.availableToggle && !station.isChargingAvaiable {
-            // check if busy switch is true
-            if !userSettings.busyToggle {
+        if !userSettings.availableToggle && station.isChargingAvaiable {
                 matchedCriteria = false
-            }
+        }
+        if !userSettings.busyToggle && !station.isChargingAvaiable {
+            matchedCriteria = false
         }
         
         // check if free switch is true and charging station is free
-        if userSettings.freeToggle && !station.isPaid {
-            // check if paid switch is true
-            if !userSettings.paidToggle {
-                matchedCriteria = false
-            }
+        if !userSettings.freeToggle && station.isPaid {
+            matchedCriteria = false;
+        }
+        if !userSettings.paidToggle && !station.isPaid {
+            matchedCriteria = false
         }
         
         // check if standard switch is try and station is standard charging
@@ -305,7 +283,7 @@ class ViewController: UIViewController, InfoPaneDelegateProtocol {
         }
         
         if matchedCriteria {
-            
+            print("matched criteria. Adding annotation.")
             self.stations.append(station)
             mapView.addAnnotation(station)
         }
@@ -321,13 +299,16 @@ class ViewController: UIViewController, InfoPaneDelegateProtocol {
     }
     
     func centerViewOnUserLocation() {
+        print("called centerViewOnUserLocation")
         if let location = locationManager.location?.coordinate {
             let region = MKCoordinateRegion.init(center: location, latitudinalMeters: Double(userSettings.proximity*regionInMeters),
                                                  longitudinalMeters: Double(userSettings.proximity*regionInMeters))
             
             mapView.setRegion(region, animated: true)
             
+            
             getNREL(coordinate: location, amount: 100)
+            
         }
     }
 
@@ -373,6 +354,7 @@ class ViewController: UIViewController, InfoPaneDelegateProtocol {
     
     //checks app specific location services
     func checkLocationAuthorization() {
+        print("called checkLocAuth func")
         switch CLLocationManager.authorizationStatus() {
         case .authorizedWhenInUse:
             mapView.showsUserLocation = true
@@ -409,7 +391,12 @@ extension ViewController: CLLocationManagerDelegate {
     
     
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        checkLocationAuthorization()
+        print("location auth changed")
+        if status != CLLocationManager.authorizationStatus(){
+            // do nothing
+            checkLocationAuthorization()
+        }
+        
     }
 }
 
